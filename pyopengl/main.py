@@ -5,7 +5,7 @@ import time
 
 # Usage example :
 if __name__ == "__main__":
-    renderer = pydraw.SimpleOpenGLImageRenderer(640, 480, "Simple OpenGL Renderer", resizable=True, v_sync=False, fullscreen=True)
+    renderer = pydraw.SimpleOpenGLImageRenderer(640, 480, "Simple OpenGL Renderer", resizable=False, v_sync=True, fullscreen=False)
     image = renderer.load_image("image_test.png")  # Specify the path to your image
     image2 = renderer.load_image("image_test.png")  # Specify the path to your image
 
