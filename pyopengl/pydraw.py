@@ -1,18 +1,28 @@
 import glfw
 from OpenGL.GL import *
 from PIL import Image
-import numpy as np
+# import numpy as np
 import time
 
 import pydrawImage
 import pydrawInput
 
+RESIZABLE = "resizable"
+V_SYNC_OFF = "v_sync_off"
+FULLSCREEN = "fullscreen"
 
-class SimpleOpenGLImageRenderer:
-    def __init__(self, window_width, window_height, window_title="OpenGL Window", max_fps=None, resizable=False,
-                 v_sync=True, fullscreen=False, window_pos=(400, 200)):
+
+class Pydraw:
+    def __init__(self, window_width, window_height, window_title="OpenGL Window",
+                 *flags, max_fps=None, window_pos=(400, 200), cursor=0):
+        self._k = None
         if not glfw.init():
             raise Exception("GLFW can not be initialized!")
+
+        flags_set = set(flags)
+        resizable = "resizable" in flags_set
+        fullscreen = "fullscreen" in flags_set
+        v_sync = "v_sync_off" not in flags_set
 
         if not resizable:
             glfw.window_hint(glfw.RESIZABLE, glfw.FALSE)
@@ -50,13 +60,37 @@ class SimpleOpenGLImageRenderer:
             glfw.swap_interval(0)
 
         glfw.set_mouse_button_callback(self.window, self.mouse_button_callback)
+        glfw.set_key_callback(self.window, self.key_callback)
+        # Initialize cursor position
+        self.cursor_position = (0, 0)
+
+        # Set up a cursor position callback
+        glfw.set_cursor_pos_callback(self.window, self.cursor_position_callback)
 
         self.MOUSE_BUTTON_DOWN, self.MOUSE_BUTTON_UP, self.KEY_DOWN, self.KEY_UP = ("self.MOUSE_BUTTON_DOWN", "self.MOUSE_BUTTON_UP", "self.Key_DOWN", "self.KEY_UP")
-        keys = pydrawInput.keys
+        self._keys = pydrawInput.keys
 
-        for key in keys:
-            setattr(self, key, pydrawInput.Key(f"{key}"))
+        self.key = pydrawInput.Keys(self._keys)
+        self.mouse = pydrawInput.Mouse()
 
+        for key in self._keys:
+            setattr(self, key, f"{key}")
+
+        if cursor == 0:
+            glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_NORMAL)  # Sets the cursor as normal
+        elif cursor == 1:
+            glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)  # Sets the cursor as hidden
+        elif cursor == 2:
+            glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)  # Locks the cursor on the window
+
+    def hide_cursor(self):
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)  # Sets the cursor as hidden
+
+    def disable_cursor(self):
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)  # Locks the cursor on the window
+
+    def show_cursor(self):
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_NORMAL)  # Sets the cursor as normal
 
     def load_image(self, image_path):
         """
@@ -128,7 +162,6 @@ class SimpleOpenGLImageRenderer:
         :type max_fps: int
 
         :return: None
-        :rtype: None
         """
         self.max_fps = max_fps
 
@@ -178,6 +211,7 @@ class SimpleOpenGLImageRenderer:
         self.events = []
 
     def quit(self):
+        self.window = None
         glfw.terminate()
 
     def window_is_open(self):
@@ -190,39 +224,62 @@ class SimpleOpenGLImageRenderer:
         if action == glfw.PRESS:
             self.events.append(pydrawInput.Event(self.MOUSE_BUTTON_DOWN))
             if button == glfw.MOUSE_BUTTON_1:
-                pass
+                self.mouse.mouse_button_pressed(0)
             elif button == glfw.MOUSE_BUTTON_2:
-                pass
+                self.mouse.mouse_button_pressed(1)
             elif button == glfw.MOUSE_BUTTON_3:
-                pass
+                self.mouse.mouse_button_pressed(2)
             elif button == glfw.MOUSE_BUTTON_4:
-                pass
+                self.mouse.mouse_button_pressed(3)
             elif button == glfw.MOUSE_BUTTON_5:
-                pass
+                self.mouse.mouse_button_pressed(4)
             elif button == glfw.MOUSE_BUTTON_6:
-                pass
+                self.mouse.mouse_button_pressed(5)
             elif button == glfw.MOUSE_BUTTON_7:
-                pass
+                self.mouse.mouse_button_pressed(6)
             elif button == glfw.MOUSE_BUTTON_8:
-                pass
+                self.mouse.mouse_button_pressed(7)
+
+
         elif action == glfw.RELEASE:
             self.events.append(pydrawInput.Event(self.MOUSE_BUTTON_UP))
             if button == glfw.MOUSE_BUTTON_1:
-                pass
+                self.mouse.mouse_button_released(0)
             elif button == glfw.MOUSE_BUTTON_2:
-                pass
+                self.mouse.mouse_button_released(1)
             elif button == glfw.MOUSE_BUTTON_3:
-                pass
+                self.mouse.mouse_button_released(2)
             elif button == glfw.MOUSE_BUTTON_4:
-                pass
+                self.mouse.mouse_button_released(3)
             elif button == glfw.MOUSE_BUTTON_5:
-                pass
+                self.mouse.mouse_button_released(4)
             elif button == glfw.MOUSE_BUTTON_6:
-                pass
+                self.mouse.mouse_button_released(5)
             elif button == glfw.MOUSE_BUTTON_7:
-                pass
+                self.mouse.mouse_button_released(6)
             elif button == glfw.MOUSE_BUTTON_8:
-                pass
+                self.mouse.mouse_button_released(7)
+
+    def key_callback(self, window, key, scancode, action, mods):
+        if action == glfw.PRESS:
+            for i in self._keys:
+                exec(f"self._k = glfw.{i}")
+                if key == self._k:
+                    self.events.append(pydrawInput.Event(self.KEY_DOWN, key=i))
+                    self.key.k_pressed(i)
+        if action == glfw.RELEASE:
+            for i in self._keys:
+                exec(f"self._k = glfw.{i}")
+                if key == self._k:
+                    self.events.append(pydrawInput.Event(self.KEY_UP, key=i))
+                    self.key.k_released(i)
+
+    def cursor_position_callback(self, window, xpos, ypos):
+        self.mouse.update_pos(xpos, ypos)
+
+    def set_cursor_position(self, x, y):
+        glfw.set_cursor_pos(self.window, x, y)
+        self.mouse.update_pos(x, y)
 
     def get_events(self):
         return self.events

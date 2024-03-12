@@ -7,30 +7,43 @@ class Keys:
     def get_pressed(self):
         return self.pressed
 
-    def key_pressed(self, key):
+    def k_pressed(self, key):
         self.pressed[key] = True
 
-    def key_released(self, key):
+    def k_released(self, key):
         self.pressed[key] = False
 
 
-class Key:
-    def __init__(self, id):
-        self._id = id
+# class Key:
+#     def __init__(self, id):
+#         self._id = id
+#
+#     def get_id(self):
+#         return self._id
 
 
 class Mouse:
     def __init__(self):
         self._pressed = [False for i in range(8)]
+        self._pos = (0, 0)
 
-    def _set_to_false(self):
-        self._pressed = [False for i in range(8)]
+    def mouse_button_released(self, key):
+        self._pressed[key] = False
+
+    def mouse_button_pressed(self, key):
+        self._pressed[key] = True
 
     def get_pressed(self, length=3):
         if length >= 8:
             return self._pressed[:8]
-        elif not length <= 3:
+        elif not length < 3:
             return self._pressed[:length]
+
+    def get_pos(self):
+        return self._pos
+
+    def update_pos(self, x, y):
+        self._pos = (x, y)
 
 
 class Event:
@@ -95,4 +108,5 @@ keys = [
     "KEY_KP_ADD",
     "KEY_KP_ENTER",
     "KEY_KP_EQUAL",
+    "KEY_SPACE"
 ]
