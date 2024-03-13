@@ -89,5 +89,5 @@ pydraw.set_cursor_position()  # Returns the position of the cursor
 pydraw.get_events()  # Returns a list of events
 
 my_image.flip_top()  # Flips the image from the top
-my_image.flip_left()  # Flips the image from the left
+my_image.flip_side()  # Flips the image from the left
 ````
