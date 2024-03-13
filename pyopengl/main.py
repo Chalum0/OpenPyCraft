@@ -5,7 +5,7 @@ import time
 
 # Usage example :
 if __name__ == "__main__":
-    renderer = pydraw.SimpleOpenGLImageRenderer(640, 480, "Simple OpenGL Renderer", resizable=True, v_sync=False, fullscreen=True)
+    renderer = pydraw.Pydraw(640, 480, "Simple OpenGL Renderer")
     image = renderer.load_image("image_test.png")  # Specify the path to your image
     image2 = renderer.load_image("image_test.png")  # Specify the path to your image
 
@@ -24,9 +24,17 @@ if __name__ == "__main__":
         renderer.draw_image(image)
         renderer.draw_image(image2)
 
+        keys = renderer.key.get_pressed()
+
+        mouse = renderer.mouse.get_pressed()
+
+
+
         if current_time - last_time >= 1.0:  # Every second, update the framerate display
             print(f"Framerate: {frame_count} FPS")
             frame_count = 0
             last_time = current_time
+        for event in renderer.get_events():
+            if event.type == renderer.KEY_DOWN:
 
         renderer.end_frame()
