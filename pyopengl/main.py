@@ -16,6 +16,8 @@ if __name__ == "__main__":
     image.set_pos((0, 0), (window_size_x/2, 0), (window_size_x/2, window_size_y), (0, window_size_y), renderer.get_window_size())
     image2.set_pos((window_size_x/2, 0), (window_size_x, 0), (window_size_x, window_size_y), (window_size_x/2, window_size_y), renderer.get_window_size())
 
+    image.flip_top()
+
     while renderer.window_is_open():
         current_time = time.time()
         frame_count += 1
@@ -36,5 +38,5 @@ if __name__ == "__main__":
             last_time = current_time
         for event in renderer.get_events():
             if event.type == renderer.KEY_DOWN:
-
+                pass
         renderer.end_frame()
