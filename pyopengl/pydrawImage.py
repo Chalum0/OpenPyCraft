@@ -17,17 +17,30 @@ class Image:
     def get_id(self):
         return self._image_id
 
+    def apply_texture_parameters(self):
+        glBindTexture(GL_TEXTURE_2D, self._image_id)
+        wrap_s = globals().get(self.texture_wrap_s, GL_REPEAT)
+        wrap_t = globals().get(self.texture_wrap_t, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
     def set_pos(self, topleft, topright, bottomright, bottomleft, window_size):
-        def to_ndc(x, y):
-            ndc_x = (x / window_size[0]) * 2 - 1
-            ndc_y = (y / window_size[1]) * -2 + 1  # Invert y-axis
+        def to_ndc(x, y, window_s):
+            if window_s[0] == 0:
+                window_s = (1, window_s[1])
+            if window_s[1] == 0:
+                window_s = (window_s[0], 1)
+
+            ndc_x = (x / window_s[0]) * 2 - 1
+            ndc_y = (y / window_s[1]) * -2 + 1  # Invert y-axis
             return ndc_x, ndc_y
 
         # Convert all four points to NDC
-        self.ndc_top_left = to_ndc(*topleft)
-        self.ndc_top_right = to_ndc(*topright)
-        self.ndc_bottom_right = to_ndc(*bottomright)
-        self.ndc_bottom_left = to_ndc(*bottomleft)
+        self.ndc_top_left = to_ndc(*topleft, window_size)
+        self.ndc_top_right = to_ndc(*topright, window_size)
+        self.ndc_bottom_right = to_ndc(*bottomright, window_size)
+        self.ndc_bottom_left = to_ndc(*bottomleft, window_size)
 
         if self.flipped_top:
             self.ndc_top_left, self.ndc_bottom_left = self.ndc_bottom_left, self.ndc_top_left

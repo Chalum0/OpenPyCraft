@@ -108,9 +108,14 @@ class Pydraw:
 
         texture = glGenTextures(1)  # Generate a unique OpenGL texture ID
         glBindTexture(GL_TEXTURE_2D, texture)  # Bind the newly generated texture ID as the active 2D texture
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)  # Load the texture into the active texture slot with parameters for how to scale the texture
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)  # Set the texture sampling parameters for minification (when texture needs to be scaled down)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)  # Set the texture sampling parameters for magnification (when texture needs to be scaled up)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     image_data)  # Load the texture into the active texture slot with parameters for how to scale the texture
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR)  # Set the texture sampling parameters for minification (when texture needs to be scaled down)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                        GL_LINEAR)  # Set the texture sampling parameters for magnification (when texture needs to be scaled up)
 
         image_key = self.texture_counter + 1  # Generate a unique key for the texture for our internal tracking
         self.texture_counter += 1  # Increment the counter for the next time we load a texture
