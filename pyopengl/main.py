@@ -14,12 +14,15 @@ if __name__ == "__main__":
     window_size_x, window_size_y = renderer.get_window_size()
 
     image.set_pos((0, 0), (window_size_x / 2, 0), (window_size_x / 2, window_size_y), (0, window_size_y), renderer.get_window_size())
+    x, y, z = (20, 1, 20)
 
-    engine = Engine.Engine(renderer.get_window_size())
+    map_matrix = [[[1 for i in range(z)] for j in range(x)] for k in range(y)]
 
-    for x in range(1):
-        for z in range(1):
-            engine.create_block((10*x, 0, 10*z), 5)
+    engine = Engine.Engine(renderer.get_window_size(), map_matrix, render_dist=10, fixed_camera=True)
+
+    # for x in range(10):
+    #     for z in range(10):
+    #         engine.create_block((10*x, 0, 10*z), 5)
 
     engine.optimise_points()
 
@@ -30,6 +33,7 @@ if __name__ == "__main__":
         current_time = time.time()
         frame_count += 1
         renderer.start_frame()
+        renderer.fill((135, 206, 235))
 
         start_time = time.time()
         engine.get_ps_vs_point()
@@ -59,7 +63,7 @@ if __name__ == "__main__":
                         pass
                     else:
                         image.set_pos(points[0], points[1], points[2], points[3], renderer.get_window_size())
-                        print(points[0], points[1], points[2], points[3])
+                        # print(points[0], points[1], points[2], points[3])
                         renderer.draw_image(image)
                 # print(time.time() - start_time)
 
@@ -83,6 +87,7 @@ if __name__ == "__main__":
 
         if current_time - last_time >= 1.0:  # Every second, update the framerate display
             print(f"Framerate: {frame_count} FPS")
+            # print(engine.camera.pos[1], engine.camera.camX, engine.camera.camY)
             frame_count = 0
             last_time = current_time
 

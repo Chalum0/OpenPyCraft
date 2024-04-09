@@ -1,4 +1,4 @@
-from math import radians, cos, sin
+from math import radians, cos, sin, dist
 
 import numpy as np
 import pyopencl as cl
@@ -6,11 +6,21 @@ import numpy
 
 
 class Camera:
-    def __init__(self):
-        self.camX = 0
-        self.camY = 0
-        self.pos = [0, 0, 0]
-        self.fov = 400
+    def __init__(self, fixed):
+        self.fixed = fixed
+
+        if self.fixed:
+            self.camX = 1.12
+            self.camY = 25.7
+            self.pos = [0, -65, 0]
+            self.fov = 400
+        else:
+            self.camX = 0
+            self.camY = 0
+            self.pos = [0, 0, 0]
+            self.fov = 400
+
+        self.player_pos = [0, 0, 0]
 
         self.speed = 2
 
@@ -24,23 +34,41 @@ class Camera:
         self.pos[1] += self.speed * dt
 
     def go_forward(self, dt):
-        self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), self.speed * dt, -self.camY + radians(90))
+        if self.fixed:
+            self.pos[2] += self.speed * dt
+            self.player_pos[2] += self.speed * dt
+        else:
+            self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), self.speed * dt, -self.camY + radians(90))
 
     def go_backward(self, dt):
-        self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), -self.speed * dt, -self.camY + radians(90))
+        if self.fixed:
+            self.pos[2] -= self.speed * dt
+            self.player_pos[2] -= self.speed * dt
+        else:
+            self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), -self.speed * dt, -self.camY + radians(90))
 
     def go_left(self, dt):
-        self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), self.speed * dt, -self.camY)
+        if self.fixed:
+            self.pos[0] -= self.speed * dt
+            self.player_pos[0] -= self.speed * dt
+        else:
+            self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), self.speed * dt, -self.camY)
 
     def go_right(self, dt):
-        self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), -self.speed * dt, -self.camY)
+        if self.fixed:
+            self.pos[0] += self.speed * dt
+            self.player_pos[0] += self.speed * dt
+        else:
+            self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), -self.speed * dt, -self.camY)
 
 
 class Block:
-    def __init__(self, coord, half_block):
+    def __init__(self, coord, half_block, display):
         self.x = int(coord[0])
         self.y = int(coord[1])
         self.z = int(coord[2])
+
+        self.display = display
 
         self.half_block = half_block
 
@@ -65,19 +93,25 @@ class Block:
     def get_displayed_polygons(self, player_pos):
         self.displayed_polygons = []
         if self.y > player_pos[1]:
-            self.displayed_polygons.append(self.top_polygon)
+            if self.display["top"]:
+                self.displayed_polygons.append(self.top_polygon)
         else:
-            self.displayed_polygons.append(self.bottom_polygon)
+            if self.display["bottom"]:
+                self.displayed_polygons.append(self.bottom_polygon)
 
         if self.x > player_pos[0]:
-            self.displayed_polygons.append(self.left_polygon)
+            if self.display["left"]:
+                self.displayed_polygons.append(self.left_polygon)
         else:
-            self.displayed_polygons.append(self.right_polygon)
+            if self.display["right"]:
+                self.displayed_polygons.append(self.right_polygon)
 
         if self.z < player_pos[2]:
-            self.displayed_polygons.append(self.back_polygon)
+            if self.display["back"]:
+                self.displayed_polygons.append(self.back_polygon)
         else:
-            self.displayed_polygons.append(self.front_polygon)
+            if self.display["front"]:
+                self.displayed_polygons.append(self.front_polygon)
         return self.displayed_polygons
 
     def get_points(self):
@@ -93,12 +127,20 @@ class Polygon:
             Point(point4[0], point4[1], point4[2])
         ]
 
+        sum_x = sum(point.x for point in self.points)
+        sum_y = sum(point.y for point in self.points)
+        sum_z = sum(point.z for point in self.points)
+        self.center = (sum_x / len(self.points), sum_y / len(self.points), sum_z / len(self.points))
+
     def get_points(self):
         return self.points
 
     def get_points_pos(self):
         return [self.points[0].get_coords(), self.points[1].get_coords(),
                 self.points[2].get_coords(), self.points[3].get_coords()]
+
+    def get_distance(self, position, render_dist):
+        return dist(position, self.center)
 
 
 class Point:
@@ -121,8 +163,8 @@ class Point:
 
 
 class Engine:
-    def __init__(self, screen_size):
-        self.camera = Camera()
+    def __init__(self, screen_size, map_matrix, block_size=10, render_dist=10, fixed_camera=False):
+        self.camera = Camera(fixed_camera)
 
         self.half_screen_x = screen_size[0]/2
         self.half_screen_y = screen_size[1]/2
@@ -136,16 +178,62 @@ class Engine:
         self.blocks = []
 
         self.bool_switch = True
+        self.map = map_matrix
+        self.block_size = block_size
+        self.transparent_block_ids = [0]
+        self.render_distance = render_dist * block_size
+        self.create_map()
+
+    def create_map(self):
+        for y in range(len(self.map)):
+            for x in range(len(self.map[y])):
+                for z in range(len(self.map[y][x])):
+                    if self.map[y][x][z] not in self.transparent_block_ids:
+                        display = {"front": False, "back": False, "left": False, "right": False, "top": False, "bottom": False}
+                        if y == 0:
+                            display["bottom"] = True
+                        if y == len(self.map)-1:
+                            display["top"] = True
+                        if not y == 0 and not y == len(self.map)-1:
+                            if self.map[y+1][x][z] in self.transparent_block_ids:
+                                display["top"] = True
+
+                            if self.map[y-1][x][z] in self.transparent_block_ids:
+                                display["bottom"] = True
+
+                        if x == 0:
+                            display["left"] = True
+                        if x == len(self.map[y])-1:
+                            display["right"] = True
+                        if not x == 0 and not x == len(self.map[y])-1:
+                            if self.map[y][x+1][z] in self.transparent_block_ids:
+                                display["right"] = True
+                            if self.map[y][x-1][z] in self.transparent_block_ids:
+                                display["left"] = True
+
+                        if z == 0:
+                            display["front"] = True
+                        if z == len(self.map[y][x])-1:
+                            display["back"] = True
+                        if not z == 0 and not z == len(self.map[y][x])-1:
+                            if self.map[y][x][z+1] in self.transparent_block_ids:
+                                display["back"] = True
+                            if self.map[y][x][z-1] in self.transparent_block_ids:
+                                display["front"] = True
+
+                        self.create_block((x*self.block_size, y*-self.block_size, z*self.block_size), self.block_size/2, display)
+        print("done")
 
     def handle_mouse_movement(self, set_pos_function, mouse_pos_x, mouse_pos_y, dt):
-        if mouse_pos_x != self.half_screen_x:
-            self.camera.camY -= ((mouse_pos_x - self.half_screen_x) * (self.camera_sensibility / 2))
-            set_pos_function(self.half_screen_x, mouse_pos_y)
-        if mouse_pos_y != self.half_screen_y:
-            move = mouse_pos_y - self.half_screen_y
-            if (move > 0 and self.camera.camX <= self.RD85) or (move < 0 and self.camera.camX >= self.NRD85):
-                self.camera.camX += (move * self.camera_sensibility)
-            set_pos_function(mouse_pos_x, self.half_screen_y)
+        if not self.camera.fixed:
+            if mouse_pos_x != self.half_screen_x:
+                self.camera.camY -= ((mouse_pos_x - self.half_screen_x) * (self.camera_sensibility / 2)) * 0.1 * 20
+                set_pos_function(self.half_screen_x, mouse_pos_y)
+            if mouse_pos_y != self.half_screen_y:
+                move = mouse_pos_y - self.half_screen_y
+                if (move > 0 and self.camera.camX <= self.RD85) or (move < 0 and self.camera.camX >= self.NRD85):
+                    self.camera.camX += (move * self.camera_sensibility) * 0.1 * 20
+                set_pos_function(mouse_pos_x, self.half_screen_y)
 
     def get_ps_vs_point(self):
         cos_x, cos_y, sin_x, sin_y = self.camera.get_sin_cos()
@@ -157,6 +245,12 @@ class Engine:
         pos_x, pos_y, pos_z = self.camera.pos
         for block in self.blocks:
             for polygon in block.get_displayed_polygons(self.camera.pos):
+                if self.camera.fixed:
+                    if polygon.get_distance(self.camera.player_pos, self.render_distance) >= self.render_distance:
+                        continue
+                else:
+                    if polygon.get_distance(self.camera.pos, self.render_distance) >= self.render_distance:
+                        continue
                 self.polygons.append(polygon)
                 for point in polygon.get_points():
                     if not point.calculated == self.bool_switch:
@@ -174,8 +268,14 @@ class Engine:
                             point.ps = None
                         point.calculated = self.bool_switch
 
-    def create_block(self, coord, half_block):
-        self.blocks.append(Block(coord, half_block))
+        self.polygons = sorted(self.polygons, key=self.distance_to_camera)
+        self.polygons.reverse()
+
+    def distance_to_camera(self, polygon):
+        return dist(self.camera.pos, polygon.center)
+
+    def create_block(self, coord, half_block, display):
+        self.blocks.append(Block(coord, half_block, display))
 
     def optimise_points(self):
         all_points = []
