@@ -190,6 +190,15 @@ class Pydraw:
         glfw.poll_events()
         glClear(GL_COLOR_BUFFER_BIT)
 
+    def fill(self, rgb=(135, 206, 235)):
+        r, g, b = self.convert_rgb(rgb)
+        glClearColor(r, g, b, 1)
+
+    def convert_rgb(self, rgb):
+        r, g, b = rgb
+        return r/255, g/255, b/255
+
+
     def end_frame(self):
         """
         Ends the current frame by swapping the buffers and handling frame rate control.
