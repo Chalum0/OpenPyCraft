@@ -1,34 +1,57 @@
-import pydraw
-import Engine
-
+import numpy as np
+import pyopencl as cl
 import time
 
-if __name__ == "__main__":
-    renderer = pydraw.Pydraw(640, 480, "Simple OpenGL Renderer", pydraw.FULLSCREEN, pydraw.V_SYNC_OFF, cursor=1)
-    image = renderer.load_image("image_test.png")  # Specify the path to your image
 
-    frame_count = 0
-    last_time = time.time()
-    window_size_x, window_size_y = renderer.get_window_size()
+def add_arrays_python(a, b):
+    result = a.copy()  # Start with a copy of a to avoid modifying the original array
+    for _ in range(500):
+        result = result + b
+    return result
 
-    image.set_pos((0, 0), (window_size_x / 2, 0), (window_size_x / 2, window_size_y), (0, window_size_y), renderer.get_window_size())
 
-    dt = 0
+def add_arrays_opencl(a_np, b_np):
+    platform = cl.get_platforms()[0]
+    device = platform.get_devices()[0]
+    context = cl.Context([device])
+    queue = cl.CommandQueue(context)
 
-    while renderer.window_is_open():
-        current_time = time.time()
-        frame_count += 1
-        renderer.start_frame()
+    a_buf = cl.Buffer(context, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=a_np)
+    b_buf = cl.Buffer(context, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=b_np)
+    result_buf = cl.Buffer(context, cl.mem_flags.WRITE_ONLY, a_np.nbytes)
+    kernel_code = """
+    __kernel void add_arrays(__global const float* a, __global const float* b, __global float* result) {
+    int id = get_global_id(0);
+    float temp = a[id];
+    for (int i = 0; i < 500; i++) {
+        temp += b[id];
+    }
+    result[id] = temp;
+}
+    """
+    program = cl.Program(context, kernel_code).build()
+    program.add_arrays(queue, a_np.shape, None, a_buf, b_buf, result_buf)
+    result_np = np.empty_like(a_np)
+    cl.enqueue_copy(queue, result_np, result_buf)
+    return result_np
 
-        start_time = time.time()
 
-        image.set_pos([749.7374867503944, 415.3486786438741], [613.9099249756276, 421.13206190488063], [660.3744414278642, 638.9624535007106], [788.6450518852187, 716.6518323850571], renderer.get_window_size())
-        renderer.draw_image(image)
+# Generate two large arrays
+a_np = np.random.rand(1000000).astype(np.float32)
+b_np = np.random.rand(1000000).astype(np.float32)
 
-        if current_time - last_time >= 1.0:  # Every second, update the framerate display
-            print(f"Framerate: {frame_count} FPS")
-            frame_count = 0
-            last_time = current_time
+# Time the Python function
+start_time = time.time()
+result_python = add_arrays_python(a_np, b_np)
+python_time = time.time() - start_time
 
-        dt = time.time() - current_time
-        renderer.end_frame()
+# Time the OpenCL function
+start_time = time.time()
+result_opencl = add_arrays_opencl(a_np, b_np)
+opencl_time = time.time() - start_time
+
+print(f"Python time: {python_time:.5f} seconds")
+print(f"OpenCL time: {opencl_time:.5f} seconds")
+
+# You can also check if the results are similar to ensure correctness
+assert np.allclose(result_python, result_opencl), "Results differ between Python and OpenCL implementations!"

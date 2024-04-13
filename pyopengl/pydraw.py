@@ -1,7 +1,7 @@
 import glfw
 from OpenGL.GL import *
 from PIL import Image
-# import numpy as np
+import numpy as np
 import time
 
 import pydrawImage
@@ -144,7 +144,7 @@ class Pydraw:
         # If a position for the image has been specified
         if not not position:
             # Set the position of the image - this adjusts the attributes of the image so that it will be rendered at the correct location in the window
-            image.set_position(position, position[0], position[1], position[2], position[3], glfw.get_window_size(self.window))
+            image.set_pos(position[0], position[1], position[2], position[3], glfw.get_window_size(self.window))
 
         # Define the four corners of the quadrilateral which are mapped
         # to the corners of the texture image. The functions glTexCoord2f
@@ -158,6 +158,32 @@ class Pydraw:
         glTexCoord2f(0, 1); glVertex2f(*image.ndc_bottom_left)
         # Finish defining the polygon
         glEnd()
+
+    def set_filter(self, filter):
+        r, g, b = self.convert_rgb(filter)
+        # print(r, g, b)
+        # r, g, b = (1, 1, 1)
+        glColor4f(r, g, b, 0)
+
+    def draw_polygons(self, image, positions, filters):
+        texture, img_width, img_height = self.textures[image.get_id()]
+        glEnable(GL_TEXTURE_2D)  # Retrieve the OpenGL texture ID, width, and height for the image from the internal dictionary using the image's key (ID)
+        glBindTexture(GL_TEXTURE_2D, texture)  # Bind the texture object to the active texture unit
+        # Begin defining the polygon (GL_QUADS specifies that we are drawing a quadrilateral i.e., a square or rectangle, which is what the image will map onto)
+        glBegin(GL_QUADS)
+        for i in range(len(positions)):
+            self.set_filter(filters[i])
+            self._draw_polygon(image, positions[i])
+        glEnd()
+
+        self.set_filter((0, 0, 0))
+
+    def _draw_polygon(self, image, position):
+        image.set_pos(position[0], position[1], position[2], position[3], glfw.get_window_size(self.window))
+        glTexCoord2f(0, 0); glVertex2f(*image.ndc_top_left)
+        glTexCoord2f(1, 0); glVertex2f(*image.ndc_top_right)
+        glTexCoord2f(1, 1); glVertex2f(*image.ndc_bottom_right)
+        glTexCoord2f(0, 1); glVertex2f(*image.ndc_bottom_left)
 
     def set_max_fps(self, max_fps):
         """
@@ -197,7 +223,6 @@ class Pydraw:
     def convert_rgb(self, rgb):
         r, g, b = rgb
         return r/255, g/255, b/255
-
 
     def end_frame(self):
         """
