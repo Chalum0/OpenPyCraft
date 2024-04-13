@@ -1,8 +1,11 @@
 import pydraw
 import Engine
-
+import threading
+import socket
 import time
+import random
 from math import dist
+import json
 
 
 renderer = pydraw.Pydraw(1920, 1080, "Simple OpenGL Renderer", pydraw.FULLSCREEN, pydraw.V_SYNC_OFF, cursor=1)
@@ -28,12 +31,44 @@ old_angleY = None
 old_angleX = None
 engine.get_ps_vs_point()
 
+host = "164.132.51.168"
+port = 8080
+FORMAT = "UTF-8"
+
+socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+socket.connect((host, port))
+socket.send(f"{random.randint(10000, 99999)}".encode(FORMAT))
+
+got_response = True
+
+
+def get_player_pos(pos):
+    global got_response
+    got_response = False
+    socket.send(str(pos).encode(FORMAT))
+    poses = socket.recv(1024).decode(FORMAT)
+    poses = json.loads(poses)
+    engine.kill_all_entities()
+    for p in poses:
+        entity = Engine.Entity(p, engine.block_size/2, "other")
+        engine.entities.append(entity)
+    got_response = True
+
+
+def get_networking(player_pos):
+    my_thread = threading.Thread(target=get_player_pos, args=(player_pos,))
+    my_thread.start()
+
+
 while renderer.window_is_open():
     start = time.time()
     current_time = time.time()
     frame_count += 1
     renderer.start_frame()
     # renderer.fill((135, 206, 235))
+
+    if got_response:
+        get_networking(engine.camera.player.pos)
 
     start_time = time.time()
 
@@ -65,9 +100,5 @@ while renderer.window_is_open():
     dt = time.time() - current_time
     renderer.end_frame()
 
-    # if time.time() - start < 0.04:
-    #     print(time.time() - start)
-
-
-
-
+socket.send("quit".encode(FORMAT))
+socket.close()
