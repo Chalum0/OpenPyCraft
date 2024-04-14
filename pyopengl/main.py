@@ -5,7 +5,7 @@ import socket
 import time
 import random
 from math import dist
-import json
+import ast
 
 
 renderer = pydraw.Pydraw(1920, 1080, "Simple OpenGL Renderer", pydraw.FULLSCREEN, pydraw.V_SYNC_OFF, cursor=1)
@@ -40,18 +40,32 @@ socket.connect((host, port))
 socket.send(f"{random.randint(10000, 99999)}".encode(FORMAT))
 
 got_response = True
+poses = []
 
 
 def get_player_pos(pos):
     global got_response
+    global poses
     got_response = False
     socket.send(str(pos).encode(FORMAT))
     poses = socket.recv(1024).decode(FORMAT)
-    poses = json.loads(poses)
-    engine.kill_all_entities()
-    for p in poses:
-        entity = Engine.Entity(p, engine.block_size/2, "other")
-        engine.entities.append(entity)
+    poses = ast.literal_eval(poses)
+
+    for i_d in poses:
+        if i_d in engine.entity_ids:
+            engine.entity_ids[i_d].set_pos(poses[i_d])
+        else:
+            engine.entity_ids[i_d] = Engine.Entity(poses[i_d], engine.block_size/2, i_d)
+
+    engine.get_entities()
+
+
+
+    # engine.kill_all_entities()
+    # for p in poses:
+    #     entity = Engine.Entity(p, engine.block_size / 2, "other")
+    #     engine.entities.append(entity)
+    # engine.get_entity_polygons()
     got_response = True
 
 
@@ -81,13 +95,13 @@ while renderer.window_is_open():
         engine.camera.go_up(dt)
     if keys[renderer.KEY_LEFT_SHIFT]:
         engine.camera.go_down(dt)
-    if keys[renderer.KEY_W]:
-        engine.camera.go_forward(dt)
-    if keys[renderer.KEY_S]:
-        engine.camera.go_backward(dt)
     if keys[renderer.KEY_D]:
-        engine.camera.go_right(dt)
+        engine.camera.go_forward(dt)
     if keys[renderer.KEY_A]:
+        engine.camera.go_backward(dt)
+    if keys[renderer.KEY_S]:
+        engine.camera.go_right(dt)
+    if keys[renderer.KEY_W]:
         engine.camera.go_left(dt)
 
 
