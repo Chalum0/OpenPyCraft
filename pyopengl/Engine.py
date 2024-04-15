@@ -1,17 +1,21 @@
 from math import radians, cos, sin, dist
-
 import numpy as np
 import pyopencl as cl
 import time
-
 import threading
+
+from assets.classes.geometry import *
 
 
 class Player:
     def __init__(self):
-        self.pos = [0, 0, 0]
-        self.light_color = (0, 255, 0)
+        self.pos = [0, -11, 0]
+        self.light_color = (255, 150, 255)
         self.light_distance = 4
+        self.entity = None
+
+    def set_entity_pos(self):
+        self.entity.set_pos(self.pos)
 
 
 class Camera:
@@ -48,6 +52,7 @@ class Camera:
         if self.fixed:
             self.pos[2] += self.speed * dt
             self.player.pos[2] += self.speed * dt
+            self._move_player_entity()
         else:
             self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), self.speed * dt, -self.camY + radians(90))
 
@@ -55,6 +60,7 @@ class Camera:
         if self.fixed:
             self.pos[2] -= self.speed * dt
             self.player.pos[2] -= self.speed * dt
+            self._move_player_entity()
         else:
             self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), -self.speed * dt, -self.camY + radians(90))
 
@@ -62,6 +68,7 @@ class Camera:
         if self.fixed:
             self.pos[0] -= self.speed * dt
             self.player.pos[0] -= self.speed * dt
+            self._move_player_entity()
         else:
             self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), self.speed * dt, -self.camY)
 
@@ -69,138 +76,12 @@ class Camera:
         if self.fixed:
             self.pos[0] += self.speed * dt
             self.player.pos[0] += self.speed * dt
+            self._move_player_entity()
         else:
             self.pos[0], self.pos[2] = calculate_new_xy((self.pos[0], self.pos[2]), -self.speed * dt, -self.camY)
 
-
-class Block:
-    def __init__(self, coord, half_block, display, points):
-        self.x = int(coord[0])
-        self.y = int(coord[1])
-        self.z = int(coord[2])
-
-        self.display = display
-
-        self.half_block = half_block
-
-        self.displayed_polygons = []
-
-        point0 = (coord[0] + half_block, coord[1] + half_block, coord[2] - half_block)
-        point1 = (coord[0] + half_block, coord[1] - half_block, coord[2] - half_block)
-        point2 = (coord[0] - half_block, coord[1] - half_block, coord[2] - half_block)
-        point3 = (coord[0] - half_block, coord[1] + half_block, coord[2] - half_block)
-        point4 = (coord[0] + half_block, coord[1] + half_block, coord[2] + half_block)
-        point5 = (coord[0] + half_block, coord[1] - half_block, coord[2] + half_block)
-        point6 = (coord[0] - half_block, coord[1] - half_block, coord[2] + half_block)
-        point7 = (coord[0] - half_block, coord[1] + half_block, coord[2] + half_block)
-
-        self.top_polygon = Polygon(point1, point2, point6, point5, points, "top")  # top
-        self.bottom_polygon = Polygon(point7, point4, point0, point3, points, "bottom")  # bottom
-        self.left_polygon = Polygon(point7, point6, point2, point3, points, "left")  # left
-        self.right_polygon = Polygon(point1, point5, point4, point0, points, "right")  # right
-        self.back_polygon = Polygon(point7, point6, point5, point4, points, "back")  # back
-        self.front_polygon = Polygon(point1, point2, point3, point0, points, "front")  # front
-
-    def get_displayed_polygons(self, player_pos):
-        self.displayed_polygons = []
-        if self.y > player_pos[1]:
-            if self.display["top"]:
-                self.displayed_polygons.append(self.top_polygon)
-        else:
-            if self.display["bottom"]:
-                self.displayed_polygons.append(self.bottom_polygon)
-
-
-        if self.display["left"]:
-            self.displayed_polygons.append(self.left_polygon)
-        if self.display["right"]:
-            self.displayed_polygons.append(self.right_polygon)
-        if self.display["back"]:
-            self.displayed_polygons.append(self.back_polygon)
-        if self.display["front"]:
-            self.displayed_polygons.append(self.front_polygon)
-
-        return self.displayed_polygons
-
-    def get_points(self):
-        return self.top_polygon.points + self.bottom_polygon.points + self.left_polygon.points + self.right_polygon.points + self.front_polygon.points + self.back_polygon.points
-
-
-class Polygon:
-    def __init__(self, point1, point2, point3, point4, points, name):
-
-        self.points = []
-        self.name = name
-
-        point_pos = f"({point1[0]}, {point1[1]}, {point1[2]}"
-        if point_pos not in points:
-            point = Point(point1[0], point1[1], point1[2])
-            points[point_pos] = point
-            self.points.append(point)
-
-        else:
-            self.points.append(points[point_pos])
-
-        point_pos = f"({point2[0]}, {point2[1]}, {point2[2]}"
-        if point_pos not in points:
-            point = Point(point2[0], point2[1], point2[2])
-            points[point_pos] = point
-            self.points.append(point)
-
-        else:
-            self.points.append(points[point_pos])
-
-        point_pos = f"({point3[0]}, {point3[1]}, {point3[2]}"
-        if point_pos not in points:
-            point = Point(point3[0], point3[1], point3[2])
-            points[point_pos] = point
-            self.points.append(point)
-
-        else:
-            self.points.append(points[point_pos])
-
-        point_pos = f"({point4[0]}, {point4[1]}, {point4[2]}"
-        if point_pos not in points:
-            point = Point(point4[0], point4[1], point4[2])
-            points[point_pos] = point
-            self.points.append(point)
-
-        else:
-            self.points.append(points[point_pos])
-
-        sum_x = sum(point.x for point in self.points)
-        sum_y = sum(point.y for point in self.points)
-        sum_z = sum(point.z for point in self.points)
-        self.center = (sum_x / len(self.points), sum_y / len(self.points), sum_z / len(self.points))
-
-    def get_points(self):
-        return self.points
-
-    def get_points_pos(self):
-        return [self.points[0].get_coords(), self.points[1].get_coords(),
-                self.points[2].get_coords(), self.points[3].get_coords()]
-
-    def get_distance(self, position, render_dist):
-        return dist(position, self.center)
-
-
-class Point:
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-        self.vs_point = None
-        self.ps = None
-
-        self.calculated = False
-
-    def get_coords(self):
-        return self.x, self.y, self.z
-
-    def reset_ps(self):
-        self.ps = None
-        self.vs_point = None
+    def _move_player_entity(self):
+        self.player.set_entity_pos()
 
 
 class Engine:
@@ -214,9 +95,14 @@ class Engine:
         self.RD85 = radians(85)
         self.NRD85 = -self.RD85
 
-        self.points = []
+        # self.points = []
         self.polygons = []
+        self.entity_polygons = []
         self.blocks = []
+        self.entities = []
+        self.entity_ids = {}
+        self.camera.player.entity = Entity(self.camera.player.pos, 5, "player")
+        # self.entities.append(self.camera.player.entity)
 
         self.bool_switch = True
         self.map = map_matrix
@@ -279,6 +165,22 @@ class Engine:
                     self.camera.camX += (move * self.camera_sensibility) * 0.1 * 20
                 set_pos_function(mouse_pos_x, self.half_screen_y)
 
+    def get_entity_polygons(self):
+        self.entity_polygons = []
+
+        for entity in self.entities:
+            for polygon in entity.get_displayed_polygons(self.camera.pos):
+                if self.camera.fixed:
+                    if not (self.camera.pos[0] - 21 * self.block_size < polygon.center[0] < self.camera.pos[
+                        0] + 4 * self.block_size and self.camera.pos[2] - 7 * self.block_size < polygon.center[2] <
+                            self.camera.pos[2] + 21 * self.block_size) or polygon.name == "bottom" or dist(
+                            self.camera.player.pos, polygon.center) > self.render_distance:
+                        continue
+                else:
+                    if polygon.get_distance(self.camera.pos, self.render_distance) >= self.render_distance * 10:
+                        continue
+                self.entity_polygons.append(polygon)
+
     def get_polygons(self):
         thread = threading.Thread(target=self._get_polygons)
         thread.start()
@@ -296,9 +198,9 @@ class Engine:
                     if polygon.get_distance(self.camera.pos, self.render_distance) >= self.render_distance*10:
                         continue
                 self.polygons.append(polygon)
-        start = time.time()
-        self.polygons = sorted(self.polygons, key=self.distance_to_camera)
-        self.polygons.reverse()
+
+        # self.polygons = sorted(self.polygons, key=self.distance_to_camera)
+        # self.polygons.reverse()
 
     def get_ps_vs_point(self):
         if not self.camera.fixed:
@@ -311,10 +213,9 @@ class Engine:
         cos_x, cos_y, sin_x, sin_y = self.camera.get_sin_cos()
 
         self.bool_switch = not self.bool_switch
-
         pos_x, pos_y, pos_z = self.camera.pos
 
-        for polygon in self.polygons:
+        for polygon in self.polygons + self.entity_polygons:
             for point in polygon.get_points():
                 if not point.calculated == self.bool_switch:
                     self.points.append(point)
@@ -338,12 +239,21 @@ class Engine:
         self.blocks.append(Block(coord, half_block, display, points))
 
     def display_polygons(self, renderer, image):
+        self.get_entity_polygons()
         self.get_ps_vs_point()
 
         polygons = []
         filters = []
+
+        # print(self.entity_polygons)
+
+        self.get_entity_polygons()
+        all_polygons = self.polygons + self.entity_polygons
+        all_polygons = sorted(all_polygons, key=self.distance_to_camera)
+        all_polygons.reverse()
+
         if len(self.points) >= 2:
-            for k in self.polygons:
+            for k in all_polygons:
                 i = k.get_points()
                 not_false_point = []
                 len_points = 0
@@ -368,6 +278,18 @@ class Engine:
                                         b / (dist(k.center, self.camera.player.pos) / self.block_size) * distance))
                         polygons.append([points[0], points[1], points[2], points[3]])
         renderer.draw_polygons(image, polygons, filters)
+
+    def kill_all_entities(self):
+        for entity in self.entities:
+            if entity.type != 'player':
+                self.entities.remove(entity)
+
+    def get_entities(self):
+        entities = [self.camera.player.entity]
+        for entity in self.entity_ids.values():
+            entities.append(entity)
+        self.entities = entities
+
 
 
 def clip3d(p1, p2, zcd, fov, screen_x, screen_y):

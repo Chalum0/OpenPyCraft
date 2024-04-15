@@ -1,3 +1,5 @@
 numpy
 pyopengl
 glfw
+pyopencl
+pillow
